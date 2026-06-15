@@ -175,11 +175,7 @@ body.dark-mode #quickInfoCard{background:var(--card)!important;border-color:var(
       <div class="sel-label" style="margin-bottom:6px">姓　名</div>
       <input id="inputName" type="text" placeholder="請輸入姓名（選填）" style="font-size:14px;color:var(--text)">
     </div>
-    <div style="display:flex;gap:8px;margin-bottom:12px">
-      <button class="gender-btn active" id="calBtnS" onclick="setCalType('solar',this)" style="font-size:13px;letter-spacing:2px">陽 曆</button>
-      <button class="gender-btn" id="calBtnL" onclick="setCalType('lunar',this)" style="font-size:13px;letter-spacing:2px">農 曆</button>
-    </div>
-    <div id="calNote" style="display:none;font-size:12px;color:var(--text3);padding:8px 12px;background:var(--bg);border:1px solid var(--border2);margin-bottom:10px;line-height:1.7">📌 農曆生日請先換算為陽曆再輸入，排盤以陽曆計算更準確。命卦以農曆年（民國年次）為基準，出生在立春前需往前一年計算。</div>
+
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
       <div>
         <div class="sel-label">出生年</div>
@@ -219,7 +215,7 @@ body.dark-mode #quickInfoCard{background:var(--card)!important;border-color:var(
       <div id="quickInfoBody"></div>
       <div id="copyFeedback" style="display:none;font-size:11px;color:#5A7850;margin-top:6px;letter-spacing:1px">✓ 已複製到剪貼簿</div>
     </div>
-    <div id="wanNote" class="wan-note" style="display:none">🌙 <strong>晚子時（流派二）</strong>：23時出生，日柱已進位隔日。</div>
+    <div id="wanNote" class="wan-note" style="display:none"></div>
     <div class="ri-bar">
       <div class="ri-icon" id="riIcon">
         <div style="font-size:26px;font-weight:600;line-height:1" id="riChar"></div>
@@ -447,7 +443,14 @@ function jqDate(y,n){const d=JQ_DB[y]?.[n];return d?new Date(y,d[0]-1,d[1],d[2],
 function yearGZ(d){const y=d.getFullYear(),ts=d.getTime(),lc=jqDate(y,"立春");const ay=(lc&&ts<lc.getTime())?y-1:y;return{gan:TG[((ay-4)%10+10)%10],zhi:DZ[((ay-4)%12+12)%12],year:ay};}
 function monthGZ(d){const ts=d.getTime(),y=d.getFullYear();let bi=-1,bts=-Infinity,bjd=null;for(let yr=y-1;yr<=y+1;yr++)for(let i=0;i<MJQ.length;i++){const jd=jqDate(yr,MJQ[i]);if(jd&&jd.getTime()<=ts&&jd.getTime()>bts){bts=jd.getTime();bi=i;bjd=jd;}}if(bi<0)bi=1;const zi=MZI[bi],yg=yearGZ(d);const mt={甲:2,己:2,乙:4,庚:4,丙:6,辛:6,丁:8,壬:8,戊:0,癸:0};return{gan:TG[(mt[yg.gan]+(zi-2+12)%12)%10],zhi:DZ[zi],jqDate:bjd};}
 function dayGZ(y,m,d){const diff=Math.round((new Date(y,m-1,d)-new Date(1992,10,29))/86400000);return{gan:TG[((5+diff)%10+10)%10],zhi:DZ[((9+diff)%12+12)%12]};}
-function hourGZ(h,dg){const zi=h<1?0:h<3?1:h<5?2:h<7?3:h<9?4:h<11?5:h<13?6:h<15?7:h<17?8:h<19?9:h<21?10:h<23?11:0;const ws={甲:0,己:0,乙:2,庚:2,丙:4,辛:4,丁:6,壬:6,戊:8,癸:8};return{gan:TG[(ws[dg]+zi)%10],zhi:DZ[zi]};}
+function hourGZ(h,dg){
+  // 晚子時(h=23)：地支仍是子，但天干+2（視為隔日子時）
+  var isLateZi=(h===23);
+  var zi=h===0||h===23?0:h<3?1:h<5?2:h<7?3:h<9?4:h<11?5:h<13?6:h<15?7:h<17?8:h<19?9:h<21?10:11;
+  var ws={甲:0,己:0,乙:2,庚:2,丙:4,辛:4,丁:6,壬:6,戊:8,癸:8};
+  var ganIdx=(ws[dg]+zi+(isLateZi?2:0))%10;
+  return{gan:TG[ganIdx],zhi:DZ[zi]};
+}
 function shiShen(ri,g){const rW=TG_WX[ri],gW=TG_WX[g],s=TG_YY[ri]===TG_YY[g];const sh={木:"火",火:"土",土:"金",金:"水",水:"木"};const ke={木:"土",火:"金",土:"水",金:"木",水:"火"};if(rW===gW)return s?"比肩":"劫財";if(sh[rW]===gW)return s?"食神":"傷官";if(sh[gW]===rW)return s?"偏印":"正印";if(ke[rW]===gW)return s?"偏財":"正財";if(ke[gW]===rW)return s?"七殺":"正官";return"—";}
 function analyzeDZ(dzArr){
   const ev=[];
@@ -548,9 +551,12 @@ function initSelects(){
   sM.innerHTML=mOpts.join('');
   // 時辰
   var hOpts=[
-    [23,"子時（23–01）"],[1,"丑時（01–03）"],[3,"寅時（03–05）"],[5,"卯時（05–07）"],
+    [0,"早子時（00–01）"],
+    [23,"晚子時（23–00）"],
+    [1,"丑時（01–03）"],[3,"寅時（03–05）"],[5,"卯時（05–07）"],
     [7,"辰時（07–09）"],[9,"巳時（09–11）"],[11,"午時（11–13）"],[13,"未時（13–15）"],
     [15,"申時（15–17）"],[17,"酉時（17–19）"],[19,"戌時（19–21）"],[21,"亥時（21–23）"],
+    [-1,"吉時（不知道時辰，以午時排盤）"],
   ];
   var hOptHtml=['<option value="">選擇時辰</option>'];
   hOpts.forEach(function(o){hOptHtml.push('<option value="'+o[0]+'">'+o[1]+'</option>');});
@@ -577,10 +583,28 @@ function doCalc(){
   if(!sY||!sY.value||!sM.value||!sD.value||!sH.value){
     alert('請選擇完整的出生年月日和時辰');return;
   }
-  const y=parseInt(sY.value),m=parseInt(sM.value),d=parseInt(sD.value),h=parseInt(sH.value);
-  const dt=new Date(y,m-1,d,h,0,0);
+  const y=parseInt(sY.value),m=parseInt(sM.value),d=parseInt(sD.value);
+  let h=parseInt(sH.value);
+  const isJiShi=(h===-1); // 吉時：以午時(11)排盤
+  const isLateZi=(h===23); // 晚子時：日柱進位隔日
+  const isEarlyZi=(h===0); // 早子時：當日子時
+  const calcH=isJiShi?11:h; // 吉時用午時
+  // 晚子時：日柱為隔日
+  let dt;
+  if(isLateZi){
+    const nextDay=new Date(y,m-1,d);
+    nextDay.setDate(nextDay.getDate()+1);
+    dt=new Date(nextDay.getFullYear(),nextDay.getMonth(),nextDay.getDate(),23,0,0);
+  } else {
+    dt=new Date(y,m-1,d,calcH,0,0);
+  }
   if(isNaN(dt.getTime()))return;
-  gRes=calcBazi(dt);gFort=calcFortune(gRes.ri,new Date());
+  gRes=calcBazi(dt);
+  // 吉時標記
+  gRes.isJiShi=isJiShi;
+  gRes.isLateZi=isLateZi;
+  gRes.isEarlyZi=isEarlyZi;
+  gFort=calcFortune(gRes.ri,new Date());
   renderAll();document.getElementById("result").style.display="block";
 }
 
@@ -636,6 +660,23 @@ const SS_DIM = {
   財運:{比肩:"財運平穩，不宜借錢給人，避免跟會合夥。",劫財:"財務起伏，破財風險高，謹慎理財不投機。",食神:"財運順暢，才華帶來收入，正財偏財均有機會。",傷官:"財運不穩定，創新帶來收益，但需防口舌破財。",正印:"財運不以財為重，貴人帶來間接利益。",偏印:"財運清淡，宜守不宜攻，謹防假貴人詐財。",偏財:"偏財旺，靈活理財，大小財均有機會，但流動快。",正財:"正財穩健，固定收入佳，理財投資宜保守。",正官:"財運隨名聲而來，薪資獎金可期，守規矩有財。",七殺:"財運受阻，意外破財需防，低調謹慎可化解。"}
 };
 function renderAll(){
+  // 吉時/晚子時提示
+  var wanNote=document.getElementById('wanNote');
+  if(wanNote){
+    if(gRes.isJiShi){
+      wanNote.style.display='block';
+      wanNote.innerHTML='☀️ <strong>吉時排盤</strong>：未填時辰，以午時（11–13時）排盤，時柱僅供參考，建議知道時辰後重新排盤。';
+    } else if(gRes.isLateZi){
+      wanNote.style.display='block';
+      wanNote.innerHTML='🌙 <strong>晚子時</strong>：23時出生，日柱已進位隔日計算，時柱天干順移兩位。';
+    } else if(gRes.isEarlyZi){
+      wanNote.style.display='block';
+      wanNote.innerHTML='🌑 <strong>早子時</strong>：00時出生，屬當日子時，日柱不進位。';
+    } else {
+      wanNote.style.display='none';
+      wanNote.innerHTML='';
+    }
+  }
   const res=gRes,fort=gFort,ri=res.ri,riC=WX_C[res.riWx],riL=WX_LT[res.riWx];
   document.getElementById("wanNote").style.display=res.isWan?"block":"none";
 
@@ -648,7 +689,18 @@ function renderAll(){
   const hNames=["子","丑","寅","卯","辰","巳","午","未","申","酉","戌","亥"];
   const hIdx=dt.getHours()<1?0:dt.getHours()<3?1:dt.getHours()<5?2:dt.getHours()<7?3:dt.getHours()<9?4:dt.getHours()<11?5:dt.getHours()<13?6:dt.getHours()<15?7:dt.getHours()<17?8:dt.getHours()<19?9:dt.getHours()<21?10:dt.getHours()<23?11:0;
   const pillarDL=document.getElementById('pillarDateLine');
-  if(pillarDL) pillarDL.textContent=dt.getFullYear()+'年'+(dt.getMonth()+1)+'月'+dt.getDate()+'日 '+hNames[hIdx]+'時';
+  if(pillarDL){
+    if(gRes.isJiShi){
+      pillarDL.textContent=dt.getFullYear()+'年'+(dt.getMonth()+1)+'月'+dt.getDate()+'日 吉時（午時排盤）';
+    } else if(gRes.isLateZi){
+      var origD=new Date(dt.getFullYear(),dt.getMonth(),dt.getDate()-1);
+      pillarDL.textContent=origD.getFullYear()+'年'+(origD.getMonth()+1)+'月'+origD.getDate()+'日 晚子時（23時）';
+    } else if(gRes.isEarlyZi){
+      pillarDL.textContent=dt.getFullYear()+'年'+(dt.getMonth()+1)+'月'+dt.getDate()+'日 早子時（00時）';
+    } else {
+      pillarDL.textContent=dt.getFullYear()+'年'+(dt.getMonth()+1)+'月'+dt.getDate()+'日 '+hNames[hIdx]+'時';
+    }
+  }
   document.getElementById("riName").textContent=ri+"日主";document.getElementById("riName").style.fontSize="17px";document.getElementById("riName").style.fontWeight="600";
   const sp=document.getElementById("sqPill");sp.textContent=res.sq;
   sp.style.background=res.sq==="身強"?"#EDF5EF":"#F6EDE8";sp.style.color=res.sq==="身強"?"#5A7A60":"#8A5840";sp.style.borderColor=res.sq==="身強"?"#5A7A60":"#8A5840";
@@ -1147,11 +1199,7 @@ function renderHistory(){
   el.innerHTML=out;
 }
 
-function setCalType(t,btn){
-  document.querySelectorAll('#calBtnS,#calBtnL').forEach(function(b){b.classList.remove('active');});
-  btn.classList.add('active');
-  document.getElementById('calNote').style.display=t==='lunar'?'block':'none';
-}
+function setCalType(t,btn){}
 var gDark=false;
 function toggleDark(){
   gDark=!gDark;
